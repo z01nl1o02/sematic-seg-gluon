@@ -39,6 +39,7 @@ class FCNx32(nn.Block):
         super(FCNx32, self).__init__()
         with self.name_scope():
             self.encode = EncodeNet(ctx)
+            self.dropout = nn.Dropout(0.5)
             self.conv = nn.Conv2D(channels=class_num,kernel_size=1,padding=0,strides=1,use_bias=False)
             self.conv.initialize(init=mx.init.Xavier(), ctx=ctx)
 
@@ -56,6 +57,7 @@ class FCNx32(nn.Block):
             out = layer(out)
         for layer in self.encode.pool32:
             out = layer(out)
+        self.dropout = nn.Dropout(0.5)
         out = self.conv(out)
         out = self.decode(out,32)
         return out
@@ -97,9 +99,9 @@ class FCNx16(nn.Block):
 if 0:
     ctx = mx.gpu()
     net = FCNx32(class_num=21,ctx=ctx)
-    X = mx.nd.zeros((1,3, 512,512),ctx=ctx)
+    X = mx.nd.zeros((1,3, 400,400),ctx=ctx)
     Y = net(X)
-    print net
+   # print net
     print "X - >Y: {} -> {}".format(X.shape,Y.shape)
 
 

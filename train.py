@@ -52,7 +52,7 @@ if not os.path.exists(outdir):
     os.makedirs(outdir)
 
 class SegDataset(gluon.data.Dataset):
-    def __init__(self,path_data, out_size = (512/2,512/2),train = True, padding_label=0):
+    def __init__(self,path_data, out_size = (512,512),train = True, padding_label=0):
         self.data_list = []
         with open(path_data,'rb') as f:
             for line in f:
@@ -81,11 +81,12 @@ class SegDataset(gluon.data.Dataset):
         label_padding[dy:dy+height,dx:dx+width,0] = label[sy:sy+height, sx:sx+width]
 
         img_padding = np.float32(np.transpose(img_padding,[2,0,1]))
-        #img_padding[0,:,:] -= 123.68
-        #img_padding[1,:,:] -= 116.779
-        #img_padding[2,:,:] -= 103.939
+        img_padding[0,:,:] -= 123.68
+        img_padding[1,:,:] -= 116.779
+        img_padding[2,:,:] -= 103.939
         label_padding = np.transpose(label_padding,[2,0,1])
 
+        #print img_padding.shape, label_padding.shape
         return img_padding,label_padding
 
     def __getitem__(self, idx):
