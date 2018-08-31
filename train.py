@@ -34,7 +34,7 @@ path_train_data = os.path.join( os.getcwd(), 'train.txt'  )
 path_test_data = os.path.join( os.getcwd(), 'test.txt')
 class_num = 21
 ctx_list = [mx.gpu(0)]
-batch_size = 1 # 1: unsteady converge 5:low converge
+batch_size = 1
 
 
 net_type = "fcn32"
@@ -42,21 +42,17 @@ net_pretrained = None #'models/fcn32_00001.params'
 
 
 start_weights = -1
-base_lr = 1e-2  #0.01
-train_size = 502
+base_lr = 1e-2
 max_epoch = 100
-max_iter = max_epoch * train_size // batch_size
 
-display_freq_train = np.maximum(int(train_size * 0.2 / batch_size),10)
 display_freq_test = 1 #epoch
-
 
 outdir = os.path.join(os.getcwd(),'models')
 if not os.path.exists(outdir):
     os.makedirs(outdir)
 
 class SegDataset(gluon.data.Dataset):
-    def __init__(self,path_data, out_size = (512,512),train = True, padding_label=0):
+    def __init__(self,path_data, out_size = (512/2,512/2),train = True, padding_label=0):
         self.data_list = []
         with open(path_data,'rb') as f:
             for line in f:
@@ -73,27 +69,21 @@ class SegDataset(gluon.data.Dataset):
 
     def _load_with_size(self,idx):
         img_path,label_path = self.data_list[idx]
-       # img = np.float32(cv2.imread(img_path,1)) - np.asarray([0,0,0])
-       # label = cv2.imread(label_path,0)
         img = cv2.imread(img_path,1)
         label = cv2.imread(label_path,0)
-        H,W,C= img.shape
-        assert(C == 3 and H <= self.img_shape[0] and W <= self.img_shape[1])
-       # img_padding = np.zeros(self.img_shape,np.float32)
-       # label_padding = np.zeros(self.label_shape,np.int64) + self.label_padding
         img_padding = np.zeros(self.img_shape,np.uint8)
         label_padding = np.zeros(self.label_shape,np.uint8) + self.label_padding
-        img_padding[0:H,0:W,:] = img
-        label_padding[0:H,0:W,0] = label
-        #print label_padding.shape
-        #label_padding = cv2.resize(label_padding,(64,64),interpolation=cv2.INTER_NEAREST)
-        #label_padding = np.expand_dims(label_padding,2)
-        #print label_padding.shape
+        width, height = np.minimum(img.shape[1], self.img_shape[1]), np.minimum(img.shape[0], self.img_shape[0])
+
+        dx, dy = (img_padding.shape[1] - width)//2, (img_padding.shape[0] - height)//2
+        sx, sy = (img.shape[1] - width)//2, (img.shape[0] - height)//2
+        img_padding[dy:dy+height,dx:dx+width,:] = img[sy:sy+height, sx:sx+width,:]
+        label_padding[dy:dy+height,dx:dx+width,0] = label[sy:sy+height, sx:sx+width]
 
         img_padding = np.float32(np.transpose(img_padding,[2,0,1]))
-        img_padding[0,:,:] -= 123.68
-        img_padding[1,:,:] -= 116.779
-        img_padding[2,:,:] -= 103.939
+        #img_padding[0,:,:] -= 123.68
+        #img_padding[1,:,:] -= 116.779
+        #img_padding[2,:,:] -= 103.939
         label_padding = np.transpose(label_padding,[2,0,1])
 
         return img_padding,label_padding
@@ -107,6 +97,13 @@ ds_train = SegDataset(path_train_data)
 ds_test = SegDataset(path_test_data)
 trainIter = gluon.data.DataLoader(ds_train,batch_size=batch_size,shuffle=True,last_batch='discard')
 testIter = gluon.data.DataLoader(ds_test,batch_size=batch_size,shuffle=False,last_batch='discard')
+
+train_size = len(ds_train)
+display_freq_train = np.maximum(int(train_size * 0.2 / batch_size),10)
+max_iter = max_epoch * train_size // batch_size
+
+
+
 
 if net_type == 'fcn32':
     net = fcn.FCNx32(class_num=class_num,ctx = ctx_list[0])
@@ -136,17 +133,8 @@ def calc_iou(pred,label):
     if isinstance(pred, mx.nd.NDArray):
         pred = pred.asnumpy()
     pred = pred.argmax(axis=1)
-    if 0 :
-        idx = 0
-        for p, l in zip(pred, label):
-            cv2.imwrite('%d_pred.bmp'%idx,np.uint8(p) * 10)
-            cv2.imwrite('%d_label.bmp'%idx,np.uint8(l[0,:,:]) * 10)
-            idx += 1
     ab_and = np.sum((pred == label) * (label > 0) )#ignore background
     ab_or = np.sum( (label > 0)  + (pred > 0) ) #- ab_and
-    #print ab_and, ab_or
-    #if ab_or == 0:
-    #    print 'label.sum() = ', label.sum()
     return np.float32(ab_and) / ab_or if ab_or > 0 else 0
 
 
