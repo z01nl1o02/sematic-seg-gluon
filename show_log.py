@@ -3,7 +3,7 @@ import numpy as np
 from collections import defaultdict
 import re
 
-logpath = 'log/log.2018-08-22-23-53-51.txt'
+logpath = 'log/log.2018-08-31-23-28-39.txt'
 
 def show_one(data,name,color = None):
     X = [d[0] for d in data[name]]
@@ -40,13 +40,15 @@ key_for_plot1 = 'train_loss,test_loss,lr'.split(',')
 key_for_plot2 = 'train_iou,test_iou,lr'.split(',')
 
 
-plt.figure()
+fig_loss = plt.figure()
 for key in key_for_plot1:
     show_one(data,key)
 plt.legend()
+fig_loss.savefig("loss.png")
 
-plt.figure()
+
+fig_iou = plt.figure()
 for key in key_for_plot2:
     show_one(data,key)
 plt.legend()
-plt.show()
+fig_iou.savefig("iou.png")

@@ -13,7 +13,7 @@ import datetime
 nowTime=datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-handleFile = logging.FileHandler("log_%s.txt"%nowTime,mode="wb")
+handleFile = logging.FileHandler("log/test_%s.txt"%nowTime,mode="wb")
 handleFile.setFormatter(formatter)
 
 handleConsole = logging.StreamHandler()
@@ -24,13 +24,14 @@ logger.setLevel(level=logging.DEBUG)
 logger.addHandler(handleFile)
 logger.addHandler(handleConsole)
 
-path_model = 'models/00099.params'
+path_model = 'models/fcn32_00008.params'
 class_num = 21
+crop_size = 256
 ctx_list = [mx.gpu(0)]
 path_test = 'test.txt'
 path_color_label = 'C:/dataset/voc/VOCdevkit/VOC2007/SegmentationClass'
 
-net = fcn.RESNET(class_num=class_num,ctx=ctx_list[0])
+net = fcn.FCNx32(class_num=class_num,ctx=ctx_list[0])
 #net.initialize(ctx = ctx_list[0] )
 
 
@@ -80,16 +81,21 @@ with open(path_test,'rb') as f:
         path_img, path_mark = line.strip().split('|')
         img = cv2.imread(path_img, 1)
         label = cv2.imread(path_mark, 0)
-        H,W,C = img.shape
 
-        img_padding = np.zeros((512,512,3),dtype=np.float32)
-        img_padding[0:H,0:W,:] = np.float32(img)
-        img_padding = np.transpose(img_padding, (2,0,1))
 
-        label_padding  = np.zeros((512,512,1),dtype=np.uint8)
-        label_padding[0:H,0:W,0] = label
-        label_padding = np.transpose(label_padding,(2,0,1))
+        img_padding = np.zeros((crop_size,crop_size,3),dtype=np.uint8)
+        label_padding  = np.zeros((crop_size,crop_size,1),dtype=np.uint8)
+        
+        width, height = np.minimum(img.shape[1], crop_size), np.minimum(img.shape[0], crop_size)
 
+        dx, dy = (img_padding.shape[1] - width)//2, (img_padding.shape[0] - height)//2
+        sx, sy = (img.shape[1] - width)//2, (img.shape[0] - height)//2
+        img_padding[dy:dy+height,dx:dx+width,:] = img[sy:sy+height, sx:sx+width,:]
+        label_padding[dy:dy+height,dx:dx+width,0] = label[sy:sy+height, sx:sx+width]
+        
+        img_padding = np.float32(img_padding)
+
+        img_padding = np.transpose(img_padding,(2,0,1))
         input_data = mx.nd.expand_dims( mx.nd.array(img_padding), axis=0).as_in_context(ctx_list[0])
         pred_prob = net(input_data).asnumpy()
         iou_list.append( calc_iou(pred_prob, label_padding) )
@@ -97,18 +103,16 @@ with open(path_test,'rb') as f:
         pred_label = np.argmax(pred_prob, axis=1)
         pred_label = np.squeeze(pred_label)
 
-        #print pred_label.min(), pred_label.max(), pred_label.shape
-        pred_color = np.zeros((H,W,C),dtype=np.uint8)
-        for y in range(H):
-            for x in range(W):
+        pred_color = np.zeros((crop_size,crop_size,3),dtype=np.uint8)
+        for y in range(crop_size):
+            for x in range(crop_size):
                 label_val = pred_label[y,x]
                 pred_color[y,x,:] = pascal_label2rgb()[label_val]
         pred_color = cv2.cvtColor(pred_color,cv2.COLOR_RGB2BGR)
         path = os.path.join(path_color_label,os.path.split(path_img)[-1])
         path = os.path.splitext(path)[0] + '.png'
-        ground_color = cv2.imread(path,1)
+        ground_color = cv2.imread(path,1)[sy:sy+height, sx:sx+width,:]
 
-        
         cv2.imshow("img",img)
         cv2.imshow("ground",ground_color)
         cv2.imshow("pred",pred_color)
