@@ -24,14 +24,15 @@ logger.setLevel(level=logging.DEBUG)
 logger.addHandler(handleFile)
 logger.addHandler(handleConsole)
 
-path_model = 'models/fcn32_00008.params'
+path_model = 'models/fcn16_00009.params'
 class_num = 21
-crop_size = 256
+crop_size = 512
 ctx_list = [mx.gpu(0)]
 path_test = 'test.txt'
 path_color_label = 'C:/dataset/voc/VOCdevkit/VOC2007/SegmentationClass'
 
-net = fcn.FCNx32(class_num=class_num,ctx=ctx_list[0])
+#net = fcn.FCNx32(class_num=class_num,ctx=ctx_list[0])
+net = fcn.FCNx16(class_num=class_num,ctx=ctx_list[0],fcnx32_path=None)
 #net.initialize(ctx = ctx_list[0] )
 
 

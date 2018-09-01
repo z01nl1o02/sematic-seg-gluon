@@ -37,8 +37,8 @@ ctx_list = [mx.gpu(0)]
 batch_size = 1
 
 
-net_type = "fcn32"
-net_pretrained = None #'models/fcn32_00001.params'
+net_type = "fcn16"
+net_pretrained = 'fcn/fcn32_00099.params'
 
 
 start_weights = -1
