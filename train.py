@@ -10,6 +10,7 @@ import os,sys
 import logging
 import datetime
 import cv2
+import random
 
 nowTime=datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
@@ -37,8 +38,8 @@ ctx_list = [mx.gpu(0)]
 batch_size = 1
 
 
-net_type = "fcn16"
-net_pretrained = 'fcn/fcn32_00099.params'
+net_type = "fcn32"
+net_pretrained = None #'fcn/fcn32_00099.params'
 
 
 start_weights = -1
@@ -67,10 +68,29 @@ class SegDataset(gluon.data.Dataset):
     def __len__(self):
         return len(self.data_list)
 
+    def _augment_flip(self,img,label):
+        rnd = np.random.randint(0, 100)
+        code = 2
+        if rnd > 75:
+            code = 1
+        elif rnd > 50:
+            code = 0
+        elif rnd > 25:
+            code = -1
+        if code != 2:
+            img = cv2.flip(img, code)
+            label = cv2.flip(label, code)
+      #  cv2.imshow("img", img)
+      #  cv2.imshow("label", label * 11)
+      #  cv2.waitKey(-500)
+        return img,label
     def _load_with_size(self,idx):
         img_path,label_path = self.data_list[idx]
         img = cv2.imread(img_path,1)
         label = cv2.imread(label_path,0)
+
+        img,label = self._augment_flip(img,label)
+
         img_padding = np.zeros(self.img_shape,np.uint8)
         label_padding = np.zeros(self.label_shape,np.uint8) + self.label_padding
         width, height = np.minimum(img.shape[1], self.img_shape[1]), np.minimum(img.shape[0], self.img_shape[0])
@@ -80,10 +100,13 @@ class SegDataset(gluon.data.Dataset):
         img_padding[dy:dy+height,dx:dx+width,:] = img[sy:sy+height, sx:sx+width,:]
         label_padding[dy:dy+height,dx:dx+width,0] = label[sy:sy+height, sx:sx+width]
 
+
+
+
         img_padding = np.float32(np.transpose(img_padding,[2,0,1]))
-        img_padding[0,:,:] -= 123.68
-        img_padding[1,:,:] -= 116.779
-        img_padding[2,:,:] -= 103.939
+       # img_padding[0,:,:] -= 123.68
+       # img_padding[1,:,:] -= 116.779
+       # img_padding[2,:,:] -= 103.939
         label_padding = np.transpose(label_padding,[2,0,1])
 
         #print img_padding.shape, label_padding.shape
@@ -120,11 +143,11 @@ else:
 trainer = gluon.Trainer(net.collect_params(),"sgd",{"wd":0.0005})
 
 loss_ce = gluon.loss.SoftmaxCrossEntropyLoss(axis=1,sparse_label=True,from_logits=False)
-
+acc = mx.metric.Accuracy()
 
 #lr_scheduler = mx.lr_scheduler.PolyScheduler(max_update=max_iter,base_lr=base_lr,pwr=1)
 t = train_size //  batch_size
-lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(step=[5*t, 10*t, 60*t, 80*t], factor=0.01)
+lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(step=[30*t, 80*t], factor=0.1)
 lr_scheduler.base_lr = base_lr
 
 
@@ -141,6 +164,7 @@ def calc_iou(pred,label):
 
 iter_num = 0
 for epoch in range(start_weights,max_epoch):
+    acc.reset()
     for batch in trainIter:
         iter_num += 1
         data,label = batch
@@ -156,11 +180,14 @@ for epoch in range(start_weights,max_epoch):
         trainer.step(batch_size)
         loss_list.extend( [loss.asnumpy() for loss in losses])
         iou_list.extend( [calc_iou(pred,label) for pred,label in zip(pred_list,label_list) ])
+        for pred, label in zip(pred_list, label_list):
+            acc.update(preds = pred, labels=label)
         if iter_num % display_freq_train == 0:
-            logger.info("iter {} train-loss {} train-iou {}".format(
-                iter_num, np.asarray(loss_list).mean(), np.asarray(iou_list).mean() ) )
+            logger.info("iter {} train-loss {} train-iou {} {}".format(
+                iter_num, np.asarray(loss_list).mean(), np.asarray(iou_list).mean(), acc.get() ))
         trainer.set_learning_rate( lr_scheduler(iter_num) )
     if epoch % display_freq_test == 0:
+        acc.reset()
         net.save_params(os.path.join(outdir,'%s_%.5d.params'%(net_type,epoch)))
         iou_list, loss_list = [], []
         for batch in testIter:
@@ -170,8 +197,10 @@ for epoch in range(start_weights,max_epoch):
             pred_list = [net(x) for x in data_list]
             iou_list.extend( [calc_iou(pred,label) for pred,label in zip(pred_list,label_list)] )
             loss_list.extend( [loss_ce(pred,label).asnumpy() for pred,label in zip(pred_list, label_list)] )
-        logger.info("epoch {} lr {} test-loss {} test-iou {}".format(
-            epoch, trainer.learning_rate, np.asarray(loss_list).mean(), np.asarray(iou_list).mean()))
+            for pred, label in zip(pred_list, label_list):
+                acc.update(preds = pred, labels = label)
+        logger.info("epoch {} lr {} test-loss {} test-iou {} {}".format(
+            epoch, trainer.learning_rate, np.asarray(loss_list).mean(), np.asarray(iou_list).mean(), acc.get() ))
 
 
 

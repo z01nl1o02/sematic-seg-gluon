@@ -40,14 +40,25 @@ class FCNx32(nn.Block):
         with self.name_scope():
             self.encode = EncodeNet(ctx)
 
-            self.dropout = nn.Dropout(0.5)
-            self.conv = nn.Conv2D(channels=class_num,kernel_size=1,padding=0,strides=1,use_bias=False)
-            self.conv.initialize(init=mx.init.Xavier(), ctx=ctx)
+            self.preproces_up = nn.Sequential()
+            self.preproces_up.add(
+                nn.Conv2D(channels=512,kernel_size=3,padding=1,strides=1),
+                nn.BatchNorm(),
+                nn.Activation("relu"),
+                nn.Dropout(0.1),
+                nn.Conv2D(channels=class_num,kernel_size=1,padding=0,strides=1)
+            )
+            for layer in self.preproces_up:
+                if isinstance(layer,nn.Conv2D):
+                    layer.initialize(init=mx.init.Xavier(), ctx=ctx)
+                else:
+                    layer.initialize(ctx=ctx)
 
     def decode(self, X, scale):
         #avoid nn.ConvTranspose2D() due to https://github.com/apache/incubator-mxnet/issues/11203
         _,_,H,W = X.shape
         return mx.nd.contrib.BilinearResize2D(X,height=H*scale,width=W*scale)
+        #return mx.nd.UpSampling(X,scale=scale,sample_type="nearest")
 
     def forward(self, *args):
         out = args[0]
@@ -57,8 +68,8 @@ class FCNx32(nn.Block):
             out = layer(out)
         for layer in self.encode.pool32:
             out = layer(out)
-        out = self.dropout(out)
-        out = self.conv(out)
+        for layer in self.preproces_up:
+            out = layer(out)
         out = self.decode(out,32)
         return out
 
@@ -109,8 +120,9 @@ class FCNx16(nn.Block):
             pool32 = layer(pool32)
 
         #print pool32.shape, pool32.shape
-        pool32 = self.parentNet.dropout(pool32)
-        pool32 = self.parentNet.conv(pool32)
+        for layer in self.parentNet.preproces_up:
+            pool32 = layer(pool32)
+
         # for layer in self.preprocess_up:
         #     pool32 = layer(pool32)
         pool32up = self.decode(pool32,2)
