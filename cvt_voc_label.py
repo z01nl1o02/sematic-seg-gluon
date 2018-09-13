@@ -5,8 +5,8 @@ import sys
 import numpy as np
 import cv2
 
-txt_file = 'voc2007.segclass.txt'  #voc segment classs png absolute path list
-path_converted = 'voc2007/labels/'
+txt_file = 'voc2012.segclass.txt'  #voc segment classs png absolute path list
+path_converted = 'voc2012/labels/'
 
 def pascal_palette(): #RGB mode
   palette = {(  0,   0,   0) : 0 ,

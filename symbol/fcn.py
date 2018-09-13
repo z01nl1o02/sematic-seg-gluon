@@ -3,13 +3,14 @@ import mxnet as mx
 from mxnet import gluon
 from mxnet import nd
 from mxnet.gluon import nn
-
+import pdb
 
 class EncodeNet(nn.Block):
     def __init__(self, ctx, verbose = False):
         super(EncodeNet,self).__init__()
         self.verbose = verbose
         base_net = gluon.model_zoo.vision.resnet50_v1(ctx=ctx,pretrained=True)
+
         with self.name_scope():
             self.pool8 = nn.Sequential()
             self.pool16 = nn.Sequential()
@@ -18,20 +19,35 @@ class EncodeNet(nn.Block):
                 self.pool8.add(layer)
             self.pool16.add(base_net.features[-3])
             self.pool32.add(base_net.features[-2])
-        for layer in self.pool8:
-            if isinstance(layer, nn.Conv2D):
-                layer.weight.lr_mult = 0.01
+        #for layer in self.pool8:
+        #    if isinstance(layer, nn.Conv2D):
+        #        layer.weight.lr_mult = 0.01
+        #        if not (layer.bias is None):
+        #           layer.bias.lr_mult = 0.01
+        #for layer in self.pool16:
+        #    if isinstance(layer, nn.Conv2D):
+        #        layer.weight.lr_mult = 0.01
+        #        if not (layer.bias is None):
+        #            layer.bias.lr_mult = 0.01
+        #for layer in self.pool32:
+        #    if isinstance(layer,nn.Conv2D):
+        #        layer.weight.lr_mult = 0.01
+        #        if not (layer.bias is None):
+        #            layer.bias.lr_mult = 0.01
         return
 
     def forward(self, *args):
         out = args[0]
         for layer in self.pool8:
             out = layer(out)
+        out8 = out
         for layer in self.pool16:
             out = layer(out)
+        out16 = out
         for layer in self.pool32:
             out = layer(out)
-        return out
+        out32 = out
+        return (out8,out16,out32)
 
 
 class FCNx32(nn.Block):
@@ -39,8 +55,26 @@ class FCNx32(nn.Block):
         super(FCNx32, self).__init__()
         with self.name_scope():
             self.encode = EncodeNet(ctx)
+            # self.encode = nn.Sequential(prefix="fcn_")
+            # self.encode.add(
+            #     nn.Conv2D(channels=512,kernel_size=3,padding=1,strides=32),
+            #     nn.BatchNorm(),
+            #     nn.Activation("relu"),
+            #     #nn.Dropout(0.5),
+            #
+            #     # nn.Conv2D(channels=128,kernel_size=3,padding=1,strides=4),
+            #     # nn.BatchNorm(),
+            #     # nn.Activation("relu"),
+            #
+            #     # nn.Conv2D(channels=128,kernel_size=3,padding=1,strides=4),
+            #     # nn.BatchNorm(),
+            #     # nn.Activation("relu"),
+            #
+            # )
+            # for layer in self.encode:
+            #     layer.initialize(ctx=ctx)
 
-            self.preproces_up = nn.Sequential()
+            self.preproces_up = nn.Sequential(prefix="fcn2_")
             self.preproces_up.add(
                 nn.Conv2D(channels=512,kernel_size=3,padding=1,strides=1),
                 nn.BatchNorm(),
@@ -71,6 +105,13 @@ class FCNx32(nn.Block):
         for layer in self.preproces_up:
             out = layer(out)
         out = self.decode(out,32)
+
+        # for layer in self.encode:
+        #     out = layer(out)
+        # for layer in self.preproces_up:
+        #     out = layer(out)
+        # #print self.encode[0].weight.data().sum().asnumpy()
+        # out = self.decode(out,32)
         return out
 
 class FCNx16(nn.Block):
@@ -134,10 +175,49 @@ class FCNx16(nn.Block):
         return out
 
 
+        
+
+
+class FCNx(nn.Block):
+    def __init__(self, class_num,ctx):
+        super(FCNx, self).__init__()
+        return
+
+    def decode(self, X, scale):
+        #avoid nn.ConvTranspose2D() due to https://github.com/apache/incubator-mxnet/issues/11203
+        _,_,H,W = X.shape
+        return mx.nd.contrib.BilinearResize2D(X,height=H*scale,width=W*scale)
+        #return mx.nd.UpSampling(X,scale=scale,sample_type="nearest")
+
+    def forward(self, *args):
+        out = args[0]
+        out = self.decode(out,32)
+        return out
+ 
+import cv2
+
 if 0:
     ctx = mx.gpu()
     #net = FCNx32(class_num=21,ctx=ctx)
-    net = FCNx16(class_num=21,fcnx32_path="../fcn/fcn32_00099.params",ctx=ctx)
+    net = FCNx(class_num=21,ctx=ctx)
+    X = cv2.imread('outmax.bmp',3)
+    X = np.transpose(X,(2,0,1))
+    X = np.expand_dims(X,0)
+    X = nd.array(X).as_in_context(ctx)
+   # X = mx.nd.zeros((1,3, 512,512),ctx=ctx)
+    Y = net(X)
+    Y = Y.asnumpy()
+    Y = np.squeeze(Y)
+    Y = np.transpose(Y, (1,2,0))
+    Y = np.uint8(Y)
+    cv2.imwrite('output.bmp',Y)
+   # print net
+    print "X - >Y: {} -> {}".format(X.shape,Y.shape)
+    
+if 0:
+    ctx = mx.gpu()
+    net = FCNx32(class_num=21,ctx=ctx)
+    #net = FCNx16(class_num=21,fcnx32_path="../fcn/fcn32_00099.params",ctx=ctx)
     X = mx.nd.zeros((1,3, 512,512),ctx=ctx)
     Y = net(X)
    # print net

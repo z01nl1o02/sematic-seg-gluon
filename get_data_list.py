@@ -1,7 +1,8 @@
 from __future__ import print_function
 import os,sys
-voc_root = 'C:/dataset/voc/VOCdevkit/VOC2007'
-voc_label_root = os.path.join(os.getcwd(),"voc2007")
+import random
+voc_root = 'C:/dataset/voc/VOCdevkit/VOC2012'
+voc_label_root = os.path.join(os.getcwd(),"voc2012")
 
 lines = []
 
@@ -14,6 +15,8 @@ for name in os.listdir(os.path.join(voc_label_root,'labels')):
     else:
         print("error: miss file\r\n\t{}\r\n\t{}\r\n".format(image_path,label_path)
               ,file=sys.stderr)
+
+random.shuffle(lines)
 
 total_num = len(lines)
 train_num = int(total_num * 0.8)
