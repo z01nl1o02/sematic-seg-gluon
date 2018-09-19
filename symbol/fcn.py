@@ -4,6 +4,65 @@ from mxnet import gluon
 from mxnet import nd
 from mxnet.gluon import nn
 import pdb
+from gluoncv.model_zoo.segbase import *
+
+
+class EncodeNet_2(nn.Block):
+    def __init__(self, ctx, verbose = False):
+        super(EncodeNet_2,self).__init__()
+        self.verbose = verbose
+        base_net = get_segmentation_model(model='fcn', dataset="pascal_voc",
+                                       backbone="resnet50", pretrained=True,aux=True)
+        base_net.collect_params().reset_ctx(ctx=ctx)
+        #print base_net
+        #print base_net
+        with self.name_scope():
+            self.pool8 = nn.Sequential()
+            self.pool8.add(
+            base_net.conv1,
+            base_net.bn1,
+            base_net.relu,
+            base_net.maxpool,     
+            base_net.layer1,
+            base_net.layer2,
+            )
+            self.pool16 = nn.Sequential()
+            self.pool16.add(
+                base_net.layer3,
+            )
+            self.pool32 = nn.Sequential()
+            self.pool32.add(
+                base_net.layer4,
+                )
+        #for layer in self.pool8:
+        #    if isinstance(layer, nn.Conv2D):
+        #        layer.weight.lr_mult = 0.01
+        #        if not (layer.bias is None):
+        #           layer.bias.lr_mult = 0.01
+        #for layer in self.pool16:
+        #    if isinstance(layer, nn.Conv2D):
+        #        layer.weight.lr_mult = 0.01
+        #        if not (layer.bias is None):
+        #            layer.bias.lr_mult = 0.01
+        #for layer in self.pool32:
+        #    if isinstance(layer,nn.Conv2D):
+        #        layer.weight.lr_mult = 0.01
+        #        if not (layer.bias is None):
+        #            layer.bias.lr_mult = 0.01
+        return
+
+    def forward(self, *args):
+        out = args[0]
+        for layer in self.pool8:
+            out = layer(out)
+        out8 = out
+        for layer in self.pool16:
+            out = layer(out)
+        out16 = out
+        for layer in self.pool32:
+            out = layer(out)
+        out32 = out
+        return (out8,out16,out32)
 
 class EncodeNet(nn.Block):
     def __init__(self, ctx, verbose = False):
@@ -54,7 +113,7 @@ class FCNx32(nn.Block):
     def __init__(self, class_num,ctx):
         super(FCNx32, self).__init__()
         with self.name_scope():
-            self.encode = EncodeNet(ctx)
+            self.encode = EncodeNet_2(ctx)
             # self.encode = nn.Sequential(prefix="fcn_")
             # self.encode.add(
             #     nn.Conv2D(channels=512,kernel_size=3,padding=1,strides=32),
@@ -73,7 +132,6 @@ class FCNx32(nn.Block):
             # )
             # for layer in self.encode:
             #     layer.initialize(ctx=ctx)
-
             self.preproces_up = nn.Sequential(prefix="fcn2_")
             self.preproces_up.add(
                 nn.Conv2D(channels=512,kernel_size=3,padding=1,strides=1),
@@ -98,13 +156,16 @@ class FCNx32(nn.Block):
         out = args[0]
         for layer in self.encode.pool8:
             out = layer(out)
+        #print 'out of pool8 ',out.shape
         for layer in self.encode.pool16:
             out = layer(out)
+        #print 'out of pool16 ',out.shape
         for layer in self.encode.pool32:
             out = layer(out)
+        #print 'out of pool32 ',out.shape
         for layer in self.preproces_up:
             out = layer(out)
-        out = self.decode(out,32)
+        out = self.decode(out,8)
 
         # for layer in self.encode:
         #     out = layer(out)
@@ -217,10 +278,11 @@ if 0:
 if 0:
     ctx = mx.gpu()
     net = FCNx32(class_num=21,ctx=ctx)
+    #print net
     #net = FCNx16(class_num=21,fcnx32_path="../fcn/fcn32_00099.params",ctx=ctx)
-    X = mx.nd.zeros((1,3, 512,512),ctx=ctx)
+    X = mx.nd.zeros((1,3, 160,160),ctx=ctx)
     Y = net(X)
-   # print net
+    
     print "X - >Y: {} -> {}".format(X.shape,Y.shape)
 
 

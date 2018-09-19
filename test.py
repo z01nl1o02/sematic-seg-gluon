@@ -24,9 +24,9 @@ logger.setLevel(level=logging.DEBUG)
 logger.addHandler(handleFile)
 logger.addHandler(handleConsole)
 
-path_model = 'models/fcn32_00075.params'
+path_model = 'models/fcn32_00427.params'
 class_num = 21
-crop_size = 224
+crop_size = 320
 ctx_list = [mx.gpu(0)]
 path_test = 'test.txt'
 path_color_label = 'C:/dataset/voc/VOCdevkit/VOC2007/SegmentationClass'
@@ -96,7 +96,7 @@ with open(path_test,'rb') as f:
         img_padding[dy:dy+height,dx:dx+width,:] = img[sy:sy+height, sx:sx+width,:]
         label_padding[dy:dy+height,dx:dx+width,0] = label[sy:sy+height, sx:sx+width]
         
-        img_padding = np.float32(img_padding)
+        img_padding = np.float32(img_padding) / 255.0
 
         img_padding = np.transpose(img_padding,(2,0,1))
         input_data = mx.nd.expand_dims( mx.nd.array(img_padding), axis=0).as_in_context(ctx_list[0])

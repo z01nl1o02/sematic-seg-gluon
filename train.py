@@ -44,8 +44,8 @@ net_pretrained = ""#'models/fcn32_00017.params' #'fcn/fcn32_00022.params'
 
 
 flag_test_init = False
-start_weights = 52
-base_lr = 1e-3
+start_weights = -1
+base_lr = 1e-4
 max_epoch = 1000
 
 display_freq_test = 1 #epoch
@@ -192,7 +192,7 @@ acc = mx.metric.Accuracy()
 
 #lr_scheduler = mx.lr_scheduler.PolyScheduler(max_update=max_iter,base_lr=base_lr,pwr=1)
 t = train_size //  batch_size
-lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(step=[30*t, 50*t,80*t], factor=0.1)
+lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(step=[1300*t, 1500*t,1800*t], factor=0.1)
 lr_scheduler.base_lr = base_lr
 
 
