@@ -34,13 +34,13 @@ logger.addHandler(handleConsole)
 ctx_list = [mx.gpu(0)]
 batch_size = 5
 
-model_file = 'models/fcnx8_04542.params' #'fcn/fcn32_00022.params'
+model_file = 'models/fcnx8_epoch55.params' #'fcn/fcn32_00022.params'
 
 #epoch-0 1e-4
 #epoch-2 1e-5
 
 base_lr = 1e-5
-max_epoch = 50
+max_epoch = 100
 
 outdir = os.path.join(os.getcwd(),'models')
 if not os.path.exists(outdir):
