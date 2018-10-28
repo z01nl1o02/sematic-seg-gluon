@@ -1,29 +1,30 @@
 # sematic-seg-gluon
-sematic segmentation with gluon
+hack gluoncv-fcn的代码，研究分析fcn使用
 
 
 # 数据   
-以VOC2007为例，当前目录设置为本工程目录
-1. 转换标签    
-   把VOC2007的SegmentationClass目录里的png的绝对路径写到voc2007.segclass.txt里，一行一个路径，运行cvt_voc_label.py，生成voc2007/labels/目录，其中的png是转换后的标签图
+VOCAug  
+[下载](https://gluon-cv.mxnet.io/build/examples_datasets/pascal_voc.html#sphx-glr-build-examples-datasets-pascal-voc-py)
 
-2. 生成train/test列表   
-   把get_data_list.py里的voc_root修改指向VOC2007根目录，运行get_data_list.py,生成train.txt和test.list
-   其中一行以|分割，第一项是jpg图像，第二项是png标签图
+数据准备和gluoncv一致，如果遇到问题可以[参考](https://blog.csdn.net/z0n1l2/article/details/83053429)
+
+# 训练
+
+python train.py
 
 
-# FCN
+# 测试
+python test.py
 
-## 训练
-1. 训练fcnx32    
-   直接 ```python train.py```
 
-2. 训练fcnx16   
-修改train.py   
-   ```net_type = "fcn16"```   
-   ```net_pretrained = 'models/fcn32_00001.params'```   
-其中net_pretrained指向训练好的fcn32模型
+# 实验结果
+[模型](https://pan.baidu.com/s/1JdS2WEi5RX4xSG_Lx2YsTA)这个在val.txt上meanIoU = 53%
 
-3. 训练fcn8    
-      
-## 实验   
+左侧是原图，中间是groundtruth， 右侧是预测结果   
+![pic1](https://github.com/z01nl1o02/sematic-seg-gluon/blob/master/images/72.jpg)    
+![pic1](https://github.com/z01nl1o02/sematic-seg-gluon/blob/master/images/111.jpg)     
+![pic1](https://github.com/z01nl1o02/sematic-seg-gluon/blob/master/images/116.jpg)    
+![pic1](https://github.com/z01nl1o02/sematic-seg-gluon/blob/master/images/105.jpg)    
+
+
+
